@@ -43,8 +43,25 @@ initialize();
 async function initialize(){
  if(!online){render();return;}
  try{student=await identity();if(student){state.learnerName=student.display_name||state.learnerName;persist();const rows=await getProgress();state.completedGames={};for(const r of rows){const old=state.completedGames[r.challenge];if(!old||r.stars>old.stars)state.completedGames[r.challenge]={stars:r.stars,bestScore:r.score};}render();return;}}catch(e){console.error(e);}
- app.innerHTML=`<section class="game-card"><h1>Welcome, explorer!</h1><form id="login"><p>Nhập tên học sinh để bắt đầu.</p><input class="name-input" name="name" placeholder="Tên học sinh" maxlength="40" required><button class="button button-primary">Start</button><p id="login-error" role="status"></p></form></section>`;
- app.querySelector("form").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await login(f.get("name"));await initialize();}catch(err){app.querySelector("#login-error").textContent=err.message;}};
+ render();
+ showNameEntry();
+}
+
+function showNameEntry(){
+ const existing=app.querySelector('#student-name-entry');
+ if(existing){existing.querySelector('input')?.focus();existing.scrollIntoView({behavior:'smooth',block:'center'});return;}
+ const panel=document.createElement('section');
+ panel.id='student-name-entry';
+ panel.className='game-card';
+ panel.innerHTML=`<h2>Nhập tên học sinh</h2><form id="student-name-form"><input class="name-input" name="name" placeholder="Tên học sinh" maxlength="40" value="${String(state.learnerName||'').replace(/[&<>"]/g,'')}" required><button class="button button-primary">Lưu tên &amp; bắt đầu</button><p id="login-error" role="status"></p></form>`;
+ app.prepend(panel);
+ panel.querySelector('form').onsubmit=async e=>{
+  e.preventDefault();
+  const name=new FormData(e.target).get('name');
+  try{await login(name);student=await identity();state.learnerName=student?.display_name||String(name).trim();persist();await initialize();}
+  catch(err){panel.querySelector('#login-error').textContent=err.message;}
+ };
+ panel.querySelector('input')?.focus();
 }
 
 function persist() {
@@ -61,7 +78,7 @@ function syncSoundButton() {
 function render() {
   if (state.screen === "home") {
     app.innerHTML = renderHome(state);
-    if(online){const b=document.createElement("button");b.className="button button-soft";b.textContent="Đổi tên học sinh";b.onclick=async()=>{await logoutStudent();student=null;state.completedGames={};state.learnerName="";persist();initialize();};app.prepend(b);}else{app.insertAdjacentHTML("afterbegin",'<p class="parent-note">Local demo – kết quả chưa gửi giáo viên.</p>');}
+    if(online){const b=document.createElement("button");b.className="button button-soft";b.textContent="Đổi tên học sinh";b.onclick=()=>showNameEntry();app.prepend(b);}else{app.insertAdjacentHTML("afterbegin",'<p class="parent-note">Local demo – kết quả chưa gửi giáo viên.</p>');}
   } else if (state.screen === "library") {
     app.innerHTML = renderLibrary();
   } else if (state.screen === "game") {

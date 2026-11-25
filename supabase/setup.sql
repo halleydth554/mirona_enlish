@@ -3,8 +3,8 @@
 -- Insert that Auth UUID as teacher: insert into public.teachers(id) values ('UUID_ADMIN');
 
 -- Run once in a new Supabase project.
-create table public.teachers(id uuid primary key references auth.users(id) on delete cascade);
-create table public.students(id uuid primary key, display_name text not null, class_name text not null default 'Alphabet', teacher_id uuid not null references public.teachers(id), recording_consent boolean not null default false);
+create table if not exists public.teachers(id uuid primary key references auth.users(id) on delete cascade);
+create table if not exists public.students(id uuid primary key, display_name text not null, class_name text not null default 'Alphabet', teacher_id uuid not null references public.teachers(id), recording_consent boolean not null default false);
 
 do $$
 begin
@@ -13,20 +13,38 @@ begin
   end if;
 end $$;
 
-create table public.game_attempts(id uuid primary key, student_id uuid not null references public.students(id) on delete cascade, challenge text not null check(challenge in ('matching','picture','missing','speaking')), started_at timestamptz not null, completed_at timestamptz, score integer not null default 0, rounds integer not null, results jsonb not null default '[]', stars integer not null default 0);
-create index on public.game_attempts(student_id,started_at desc);
-create table public.teacher_reviews(attempt_id uuid primary key references public.game_attempts(id) on delete cascade, rating integer check(rating between 1 and 5), feedback text not null default '');
+create table if not exists public.game_attempts(id uuid primary key, student_id uuid not null references public.students(id) on delete cascade, challenge text not null check(challenge in ('matching','picture','missing','speaking')), started_at timestamptz not null, completed_at timestamptz, score integer not null default 0, rounds integer not null, results jsonb not null default '[]', stars integer not null default 0);
+create index if not exists game_attempts_student_id_started_at_idx on public.game_attempts(student_id,started_at desc);
+create table if not exists public.teacher_reviews(attempt_id uuid primary key references public.game_attempts(id) on delete cascade, rating integer check(rating between 1 and 5), feedback text not null default '');
 alter table public.teachers enable row level security;
 alter table public.students enable row level security;
 alter table public.game_attempts enable row level security;
 alter table public.teacher_reviews enable row level security;
+
+drop policy if exists teacher_self on public.teachers;
+drop policy if exists student_read on public.students;
+drop policy if exists attempt_read on public.game_attempts;
+drop policy if exists attempt_insert on public.game_attempts;
+drop policy if exists attempt_update on public.game_attempts;
+drop policy if exists review_teacher on public.teacher_reviews;
+drop policy if exists clip_insert on storage.objects;
+drop policy if exists clip_read on storage.objects;
+drop policy if exists clip_update on storage.objects;
+drop policy if exists clip_delete_teacher on storage.objects;
+
 create policy teacher_self on public.teachers for select to authenticated using(id=auth.uid());
 create policy student_read on public.students for select to authenticated using(id=auth.uid() or teacher_id=auth.uid());
 create policy attempt_read on public.game_attempts for select to authenticated using(exists(select 1 from public.students s where s.id=student_id and (s.id=auth.uid() or s.teacher_id=auth.uid())));
 create policy attempt_insert on public.game_attempts for insert to authenticated with check(student_id=auth.uid());
 create policy attempt_update on public.game_attempts for update to authenticated using(student_id=auth.uid()) with check(student_id=auth.uid());
 create policy review_teacher on public.teacher_reviews for all to authenticated using(exists(select 1 from public.game_attempts a join public.students s on s.id=a.student_id where a.id=attempt_id and s.teacher_id=auth.uid())) with check(exists(select 1 from public.game_attempts a join public.students s on s.id=a.student_id where a.id=attempt_id and s.teacher_id=auth.uid()));
-insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('speaking','speaking',false,10000000,array['video/webm','video/mp4','audio/webm','audio/mp4']);
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+values('speaking','speaking',false,10000000,array['video/webm','video/mp4','audio/webm','audio/mp4'])
+on conflict (id) do update set
+  name=excluded.name,
+  public=excluded.public,
+  file_size_limit=excluded.file_size_limit,
+  allowed_mime_types=excluded.allowed_mime_types;
 create policy clip_insert on storage.objects for insert to authenticated with check(bucket_id='speaking' and (storage.foldername(name))[1]=auth.uid()::text and exists(select 1 from public.students s where s.id=auth.uid() and s.recording_consent));
 create policy clip_read on storage.objects for select to authenticated using(bucket_id='speaking' and exists(select 1 from public.students s where s.id::text=(storage.foldername(name))[1] and (s.id=auth.uid() or s.teacher_id=auth.uid())));
 create policy clip_update on storage.objects for update to authenticated using(bucket_id='speaking' and (storage.foldername(name))[1]=auth.uid()::text) with check(bucket_id='speaking' and (storage.foldername(name))[1]=auth.uid()::text and exists(select 1 from public.students s where s.id=auth.uid() and s.recording_consent));
@@ -162,3 +180,6 @@ grant execute on function public.register_student(text,text) to anon;
 grant execute on function public.get_student(text) to anon;
 grant execute on function public.save_game_attempt(text,jsonb) to anon;
 grant execute on function public.get_student_progress(text) to anon;
+
+-- Bắt buộc sau khi tạo/sửa function; làm mới PostgREST schema cache.
+NOTIFY pgrst, 'reload schema';

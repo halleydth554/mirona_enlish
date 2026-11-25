@@ -34,6 +34,9 @@ export async function login(name) {
   const cleanName=String(name||'').trim().replace(/\s+/g,' ').slice(0,40);
   if(!cleanName) throw Error('Vui lòng nhập tên học sinh');
   const result=await c.rpc('register_student',{p_device_id:getDeviceId(),p_name:cleanName});
+  if(result.error?.message?.includes('Could not find the function public.register_student')){
+    throw Error('Supabase chưa có hàm register_student. Hãy chạy nội dung supabase/setup.sql trong SQL Editor, đợi vài giây rồi thử lại.');
+  }
   const student=check(result);
   const value=Array.isArray(student)?student[0]:student;
   if(!value) throw Error('Không lưu được thông tin học sinh');
