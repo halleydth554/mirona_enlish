@@ -20,7 +20,7 @@ jobs:
 
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_SECRET_KEY: ${{ secrets.VITE_SUPABASE_SECRET_KEY }}
+      VITE_SUPABASE_PUBLIC_KEY: ${{ secrets.VITE_SUPABASE_PUBLIC_KEY }}
 
     steps:
       - name: Checkout
@@ -41,8 +41,8 @@ jobs:
             echo "Missing VITE_SUPABASE_URL"
             exit 1
           }
-          test -n "$VITE_SUPABASE_SECRET_KEY" || {
-            echo "Missing VITE_SUPABASE_SECRET_KEY"
+          test -n "$VITE_SUPABASE_PUBLIC_KEY" || {
+            echo "Missing VITE_SUPABASE_PUBLIC_KEY"
             exit 1
           }
 
