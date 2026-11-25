@@ -1,4 +1,4 @@
-import { online, db, check, login, identity, saveAttempt } from "./services/backend.js";
+import { online, db, check, login, identity, saveAttempt, logoutStudent, getProgress } from "./services/backend.js";
 import { speakingRounds, mountSpeaking, stopRecording } from "./games/speaking.js";
 import { LESSON_WORDS, GAME_CATALOG, LESSON_QUESTION } from "./data/lesson.js";
 import { loadSavedState, saveState } from "./core/storage.js";
@@ -42,7 +42,7 @@ initialize();
 
 async function initialize(){
  if(!online){render();return;}
- try{student=await identity();if(student){const c=await db();const rows=check(await c.from("game_attempts").select("challenge,score,stars").eq("student_id",student.id).not("completed_at","is",null));state.completedGames={};for(const r of rows){const old=state.completedGames[r.challenge];if(!old||r.stars>old.stars)state.completedGames[r.challenge]={stars:r.stars,bestScore:r.score};}render();return;}}catch(e){console.error(e);}
+ try{student=await identity();if(student){state.learnerName=student.display_name||state.learnerName;persist();const rows=await getProgress();state.completedGames={};for(const r of rows){const old=state.completedGames[r.challenge];if(!old||r.stars>old.stars)state.completedGames[r.challenge]={stars:r.stars,bestScore:r.score};}render();return;}}catch(e){console.error(e);}
  app.innerHTML=`<section class="game-card"><h1>Welcome, explorer!</h1><form id="login"><p>Nhập tên học sinh để bắt đầu.</p><input class="name-input" name="name" placeholder="Tên học sinh" maxlength="40" required><button class="button button-primary">Start</button><p id="login-error" role="status"></p></form></section>`;
  app.querySelector("form").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await login(f.get("name"));await initialize();}catch(err){app.querySelector("#login-error").textContent=err.message;}};
 }
@@ -61,7 +61,7 @@ function syncSoundButton() {
 function render() {
   if (state.screen === "home") {
     app.innerHTML = renderHome(state);
-    if(online){const b=document.createElement("button");b.className="button button-soft";b.textContent="Đổi học sinh / Sign out";b.onclick=async()=>{await (await db()).auth.signOut();student=null;state.completedGames={};initialize();};app.prepend(b);}else{app.insertAdjacentHTML("afterbegin",'<p class="parent-note">Local demo – kết quả chưa gửi giáo viên.</p>');}
+    if(online){const b=document.createElement("button");b.className="button button-soft";b.textContent="Đổi tên học sinh";b.onclick=async()=>{await logoutStudent();student=null;state.completedGames={};state.learnerName="";persist();initialize();};app.prepend(b);}else{app.insertAdjacentHTML("afterbegin",'<p class="parent-note">Local demo – kết quả chưa gửi giáo viên.</p>');}
   } else if (state.screen === "library") {
     app.innerHTML = renderLibrary();
   } else if (state.screen === "game") {
