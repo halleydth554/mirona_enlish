@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#6c63ff">
+  <meta name="description" content="A playful, self-paced English alphabet adventure for young learners.">
+  <title>My Alphabet World · Adventure Game</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="My Alphabet World home">
+        <span class="brand-mark" aria-hidden="true">🌈</span>
+        <span>MY ALPHABET WORLD</span>
+      </a>
+      <div class="topbar-actions">
+        <button class="icon-button" id="sound-toggle" type="button" aria-pressed="true" title="Toggle sound">
+          <span id="sound-icon" aria-hidden="true">🔊</span>
+          <span class="button-label" id="sound-label">Sound on</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="app" class="app-main" tabindex="-1">
+      <div class="loading-card" role="status">Getting the adventure ready… ✨</div>
+    </main>
+
+    <footer class="site-footer">
+      <span>Made for little learners</span>
+      <span aria-hidden="true">✦</span>
+      <span>Learn · Play · Shine</span>
+    </footer>
+  </div>
+  <script type="module" src="./assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teacher dashboard</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+
+<body>
+    <main class="page-shell" style="padding:24px 0">
+        <h1>Teacher Dashboard</h1>
+        <p>Alphabet Adventure · Kết quả học sinh</p>
+        <form id="login" class="game-card">
+            <input name="password" type="password" placeholder="Mật khẩu quản trị" required>
+            <button class="button button-primary">Đăng nhập quản trị</button>
+        </form>
+        <p id="status" role="status"></p>
+        <section id="dashboard" hidden><button id="logout" class="button button-soft">Đăng xuất</button> <button
+                id="refresh" class="button button-soft">Làm mới</button> <button id="export"
+                class="button button-primary">CSV</button>
+            <p><label>Học sinh <select id="filter"></select></label></p>
+            <div id="results"></div>
+        </section>
+    </main>
+    <script type="module" src="assets/js/teacher.js"></script>
+</body>
+
+</html>

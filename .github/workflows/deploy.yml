@@ -1,0 +1,84 @@
+name: Deploy Alphabet Review
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify environment variables
+        run: |
+          test -n "$VITE_SUPABASE_URL" || {
+            echo "Missing VITE_SUPABASE_URL"
+            exit 1
+          }
+          test -n "$VITE_SUPABASE_KEY" || {
+            echo "Missing VITE_SUPABASE_KEY"
+            exit 1
+          }
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build production
+        run: npm run build
+
+      - name: Verify production files
+        run: |
+          test -f dist/index.html
+          test -f dist/teacher.html
+
+          if grep -q 'assets/js/main.js' dist/index.html; then
+            echo "ERROR: Vite build is invalid"
+            exit 1
+          fi
+
+          ls -la dist/assets
+          cat dist/index.html
+
+      - name: Upload production artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
