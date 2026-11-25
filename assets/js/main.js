@@ -53,7 +53,7 @@ function showNameEntry(){
  const panel=document.createElement('section');
  panel.id='student-name-entry';
  panel.className='game-card';
- panel.innerHTML=`<h2>Nhập tên học sinh</h2><form id="student-name-form"><input class="name-input" name="name" placeholder="Tên học sinh" maxlength="40" value="${String(state.learnerName||'').replace(/[&<>"]/g,'')}" required><button class="button button-primary">Lưu tên &amp; bắt đầu</button><p id="login-error" role="status"></p></form>`;
+ panel.innerHTML=`<h2>Enter student name</h2><form id="student-name-form"><input class="name-input" name="name" placeholder="Student name" maxlength="40" value="${String(state.learnerName||'').replace(/[&<>"']/g,'')}" required><button class="button button-primary">Save name &amp; start</button><p id="login-error" role="status"></p></form>`;
  app.prepend(panel);
  panel.querySelector('form').onsubmit=async e=>{
   e.preventDefault();
@@ -78,7 +78,7 @@ function syncSoundButton() {
 function render() {
   if (state.screen === "home") {
     app.innerHTML = renderHome(state);
-    if(online){const b=document.createElement("button");b.className="button button-soft";b.textContent="Đổi tên học sinh";b.onclick=()=>showNameEntry();app.prepend(b);}else{app.insertAdjacentHTML("afterbegin",'<p class="parent-note">Local demo – kết quả chưa gửi giáo viên.</p>');}
+    if(online){const toolbar=document.createElement("div");toolbar.className="student-name-toolbar";const b=document.createElement("button");b.className="button student-name-button";b.type="button";b.textContent="Change student name";b.onclick=()=>showNameEntry();toolbar.append(b);app.append(toolbar);}else{app.insertAdjacentHTML("afterbegin",'<p class="parent-note">Local demo – kết quả chưa gửi giáo viên.</p>');}
   } else if (state.screen === "library") {
     app.innerHTML = renderLibrary();
   } else if (state.screen === "game") {

@@ -4,12 +4,13 @@
 
 -- Run once in a new Supabase project.
 create table if not exists public.teachers(id uuid primary key references auth.users(id) on delete cascade);
-create table if not exists public.students(id uuid primary key, display_name text not null, class_name text not null default 'Alphabet', teacher_id uuid not null references public.teachers(id), recording_consent boolean not null default false);
+create table if not exists public.students(id uuid primary key, display_name text not null, class_name text not null default 'Alphabet', teacher_id uuid references public.teachers(id), recording_consent boolean not null default false);
 
 do $$
 begin
   if to_regclass('public.students') is not null then
     alter table public.students drop constraint if exists students_id_fkey;
+    alter table public.students alter column teacher_id drop not null;
   end if;
 end $$;
 
@@ -77,7 +78,8 @@ begin
   limit 1;
 
   if v_teacher_id is null then
-    raise exception 'Chưa tạo tài khoản quản trị trong bảng teachers';
+    -- Không bắt buộc: học sinh vẫn được tạo, giáo viên có thể gán sau.
+    null;
   end if;
 
   select * into v_student
@@ -98,6 +100,11 @@ begin
     where id = v_student.id
     returning * into v_student;
   end if;
+
+  update public.students
+  set teacher_id = v_teacher_id
+  where teacher_id is null
+    and v_teacher_id is not null;
 
   return v_student;
 end;
@@ -176,10 +183,29 @@ revoke all on function public.register_student(text,text) from public, anon, aut
 revoke all on function public.get_student(text) from public, anon, authenticated;
 revoke all on function public.save_game_attempt(text,jsonb) from public, anon, authenticated;
 revoke all on function public.get_student_progress(text) from public, anon, authenticated;
-grant execute on function public.register_student(text,text) to anon;
-grant execute on function public.get_student(text) to anon;
-grant execute on function public.save_game_attempt(text,jsonb) to anon;
-grant execute on function public.get_student_progress(text) to anon;
+grant execute on function public.register_student(text,text) to anon, authenticated;
+grant execute on function public.get_student(text) to anon, authenticated;
+grant execute on function public.save_game_attempt(text,jsonb) to anon, authenticated;
+grant execute on function public.get_student_progress(text) to anon, authenticated;
+
+grant usage on schema public to anon, authenticated;
+grant select on table public.teachers to authenticated;
+grant select on table public.students to authenticated;
+grant select, insert, update on table public.game_attempts to authenticated;
+grant select, insert, update, delete on table public.teacher_reviews to authenticated;
+
+-- Tự động lấy UUID của tài khoản admin và đưa vào bảng teachers.
+insert into public.teachers(id)
+select id
+from auth.users
+where email = 'admin@alphabet.local'
+on conflict (id) do nothing;
+
+-- Gán giáo viên hiện có cho các học sinh chưa gán.
+update public.students s
+set teacher_id = t.id
+from (select id from public.teachers order by id limit 1) t
+where s.teacher_id is null;
 
 -- Bắt buộc sau khi tạo/sửa function; làm mới PostgREST schema cache.
 NOTIFY pgrst, 'reload schema';
