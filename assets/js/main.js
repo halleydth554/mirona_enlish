@@ -1,5 +1,4 @@
 import { online, db, check, login, identity, saveAttempt, logoutStudent, getProgress } from "./services/backend.js";
-import { speakingRounds, mountSpeaking, stopRecording } from "./games/speaking.js";
 import { LESSON_WORDS, GAME_CATALOG, LESSON_QUESTION } from "./data/lesson.js";
 import { loadSavedState, saveState } from "./core/storage.js";
 import { speak, setSpeechEnabled, stopSpeech, setPreferredVoice } from "./core/speech.js";
@@ -22,16 +21,9 @@ const state = {
   learnerName: saved.learnerName || "",
   soundEnabled: saved.soundEnabled !== false,
   voiceName: "Zira",
-  completedGames: Object.fromEntries(Object.entries(saved.completedGames || {}).filter(([key])=>key!=="spelling")),
+  completedGames: Object.fromEntries(Object.entries(saved.completedGames || {}).filter(([key])=>GAME_CATALOG.some(game=>game.id===key))),
   totalStars: saved.totalStars || 0,
   session: null
-};
-
-const GAME_ROUNDS = {
-  matching: 10,
-  picture: 10,
-  missing: 10,
-  speaking: 5
 };
 
 setAudioEnabled(state.soundEnabled);
@@ -42,7 +34,7 @@ initialize();
 
 async function initialize(){
  if(!online){render();return;}
- try{student=await identity();if(student){state.learnerName=student.display_name||state.learnerName;persist();const rows=await getProgress();state.completedGames={};for(const r of rows){const old=state.completedGames[r.challenge];if(!old||r.stars>old.stars)state.completedGames[r.challenge]={stars:r.stars,bestScore:r.score};}render();return;}}catch(e){console.error(e);}
+ try{student=await identity();if(student){state.learnerName=student.display_name||state.learnerName;persist();const rows=await getProgress();state.completedGames={};for(const r of rows){if(!GAME_CATALOG.some(game=>game.id===r.challenge))continue;const old=state.completedGames[r.challenge];if(!old||r.stars>old.stars)state.completedGames[r.challenge]={stars:r.stars,bestScore:r.score};}render();return;}}catch(e){console.error(e);}
  render();
  showNameEntry();
 }
@@ -82,25 +74,20 @@ function render() {
   } else if (state.screen === "library") {
     app.innerHTML = renderLibrary();
   } else if (state.screen === "game") {
-    if(state.session.game.id === "speaking") mountSpeaking(app,state.session,{student,next:nextRound,render});
-    else app.innerHTML = renderGameView(state.session);
+    app.innerHTML = renderGameView(state.session);
   } else if (state.screen === "complete") {
     app.innerHTML = renderCompletion(state.session);
   }
 }
 
 function startGame(gameId) {
-  stopRecording();
   const game = GAME_CATALOG.find((item) => item.id === gameId);
   if (!game) return;
-
-  const totalRounds = GAME_ROUNDS[gameId];
-  const words = gameId === "speaking" ? speakingRounds() : [];
 
   state.session = {
     game,
     round: 1,
-    totalRounds,
+    totalRounds: game.rounds,
     score: 0,
     attempts: 0,
     answered: false,
@@ -109,7 +96,7 @@ function startGame(gameId) {
     used: [],
     question: null,
     chosen: [],
-    words, id: crypto.randomUUID(), startedAt:new Date().toISOString(), results:[]
+    id: crypto.randomUUID(), startedAt:new Date().toISOString(), results:[]
   };
 
   loadQuestion();
@@ -126,9 +113,6 @@ function loadQuestion() {
   session.hintVisible = false;
   session.attempts = 0;
   session.chosen = [];
-  session.listening = false;
-  session.voiceStatus = "";
-  session.voiceTranscript = "";
 
   if (session.game.id === "matching") {
     session.question = createMatchingQuestion(session.used, session.round);
@@ -136,8 +120,6 @@ function loadQuestion() {
     session.question = createPictureQuestion(session.used);
   } else if (session.game.id === "missing") {
     session.question = createMissingLetterQuestion();
-  } else if (session.game.id === "speaking") {
-    session.question = session.words[session.round - 1];
   }
 
   if (session.game.id === "matching") {
@@ -148,13 +130,7 @@ function loadQuestion() {
 }
 
 function speakCurrentQuestion() {
-  const { game, question } = state.session;
-  if (game.id === "speaking") {
-    const letters = question.word.toUpperCase().split("").join(" - ");
-    const word = question.word.charAt(0).toUpperCase() + question.word.slice(1);
-    speak(`${word} - ${letters} - ${word}`, { lang: "en-US", rate: 0.56, pitch: 1.04 });
-    return;
-  }
+  const { question } = state.session;
   speak(question.speak, { lang: "en-US", rate: 0.56, pitch: 1.04 });
 }
 
@@ -198,7 +174,7 @@ async function nextRound() {
 
   if(session.saving)return;session.saving=true;
   try{if(online){if(session.round===session.totalRounds){session.completedAt=new Date().toISOString();session.stars=calculateStars(session.score,session.totalRounds);}await saveAttempt(session);}}catch(e){alert("Chưa lưu được kết quả. Bấm Next để thử lại: "+e.message);session.saving=false;session.completedAt=null;return false;}
-  session.saving=false;if(state.session!==session)return false;stopRecording();
+  session.saving=false;if(state.session!==session)return false;
   if (session.round >= session.totalRounds) {
     finishGame();
     return true;
@@ -229,7 +205,6 @@ function finishGame() {
 }
 
 function goHome() {
-  stopRecording();
   state.screen = "home";
   state.session = null;
   render();
@@ -292,10 +267,10 @@ soundToggle.addEventListener("click", () => {
   setSpeechEnabled(state.soundEnabled);
   persist();
   syncSoundButton();
-  if (state.soundEnabled && !state.session?.listening) {
+  if (state.soundEnabled) {
     speak("Sound is on. Let's play!", { lang: "en-US" });
   }
 });
 
-window.addEventListener("pagehide", () => { stopRecording(); persist(); });
+window.addEventListener("pagehide", persist);
 

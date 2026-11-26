@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
     base: './',
+    envPrefix: ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLIC_KEY'],
 
     server: {
         port: 8000,

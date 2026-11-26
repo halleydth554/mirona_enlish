@@ -1,10 +1,92 @@
-import {db,check} from './services/backend.js';
-const $=id=>document.getElementById(id), status=$('status');let rows=[],students=[];
-const node=(tag,text)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;return n;};
-async function load(){const c=await db();const {data}=await c.auth.getSession();if(!data.session)return;const teacher=check(await c.from('teachers').select('id').eq('id',data.session.user.id).maybeSingle());if(!teacher)throw Error('Không có quyền giáo viên');students=check(await c.from('students').select('*'));rows=check(await c.from('game_attempts').select('*').order('started_at',{ascending:false}));$('login').hidden=true;$('dashboard').hidden=false;const f=$('filter');f.replaceChildren(new Option('Tất cả',''));students.forEach(s=>f.add(new Option(s.display_name,s.id)));render();}
-function accuracy(r){const first=r.results.filter(x=>x.try===1);return first.length?Math.round(first.filter(x=>x.correct).length/first.length*100)+'%':'—';}
-function render(){const root=$('results');root.replaceChildren();for(const s of students.filter(s=>!$('filter').value||s.id===$('filter').value)){const card=node('section');card.className='game-card';card.style.cssText='text-align:left;margin:16px 0';card.append(node('h2',s.display_name+' · '+s.class_name));const attempts=rows.filter(r=>r.student_id===s.id);card.append(node('p',`Hoàn thành ${new Set(attempts.filter(r=>r.completed_at).map(r=>r.challenge)).size}/4 challenge`));for(const r of attempts){const d=node('details');d.style.margin='12px 0';const clips=r.results.filter(x=>x.video_path);d.append(node('summary',`${r.challenge} · ${new Date(r.started_at).toLocaleString()} · ${r.completed_at?'Hoàn thành':'Đang làm'} · ${r.challenge==='speaking'?clips.length+'/5 video':accuracy(r)+' đúng lần đầu'}`));for(const x of r.results){const p=node('p',x.word?`${x.round}. ${x.word} · ${x.video_path?'Đã nộp':'Luyện không quay'}`:`${x.round}. ${x.question} | ${x.answer} → ${x.expected} ${x.correct?'✓':'✗'} (lần ${x.try})`);d.append(p);if(x.video_path){const b=node('button','Xem video');b.className='button button-soft';b.onclick=async()=>{try{const c=await db();const data=check(await c.storage.from('speaking').createSignedUrl(x.video_path,120));const v=node('video');v.controls=true;v.playsInline=true;v.src=data.signedUrl;v.style.maxWidth='100%';b.replaceWith(v);}catch(e){status.textContent=e.message;}};d.append(b);const del=node('button','Xóa video');del.onclick=async()=>{if(!confirm('Xóa video này vĩnh viễn?'))return;try{check(await (await db()).storage.from('speaking').remove([x.video_path]));status.textContent='Đã xóa video; lịch sử nộp bài vẫn được giữ.';del.disabled=true;b.disabled=true;}catch(e){status.textContent=e.message;}};d.append(del);}}if(r.challenge==='speaking'){const rating=node('input');rating.type='number';rating.min=1;rating.max=5;rating.placeholder='1–5';const feedback=node('textarea');feedback.placeholder='Nhận xét';const save=node('button','Lưu đánh giá');save.onclick=async()=>{try{check(await (await db()).from('teacher_reviews').upsert({attempt_id:r.id,rating:Number(rating.value),feedback:feedback.value}));status.textContent='Đã lưu nhận xét';}catch(e){status.textContent=e.message;}};d.addEventListener('toggle',async()=>{if(d.open){try{const review=check(await (await db()).from('teacher_reviews').select('*').eq('attempt_id',r.id).maybeSingle());if(review){rating.value=review.rating;feedback.value=review.feedback;}}catch(e){status.textContent=e.message;}}});d.append(rating,feedback,save);}card.append(d);}root.append(card);}}
-$('login').onsubmit=async e=>{e.preventDefault();try{const f=new FormData(e.target);if(f.get('password')!==ADMIN_PASSWORD)throw Error('Mật khẩu quản trị không đúng');check(await (await db()).auth.signInWithPassword({email:ADMIN_EMAIL,password:ADMIN_PASSWORD}));await load();}catch(e){status.textContent=friendlyLoginError(e.message);}};
+import { db, check } from './services/backend.js';
+import { GAME_CATALOG } from './data/lesson.js';
+
+const $ = id => document.getElementById(id);
+const status = $('status');
+const challenges = new Set(GAME_CATALOG.map(game => game.id));
+let rows = [];
+let students = [];
+
+const node = (tag, text) => {
+  const element = document.createElement(tag);
+  if (text != null) element.textContent = text;
+  return element;
+};
+
+async function load() {
+  const client = await db();
+  const { data } = await client.auth.getSession();
+  if (!data.session) return;
+
+  const teacher = check(await client.from('teachers').select('id').eq('id', data.session.user.id).maybeSingle());
+  if (!teacher) throw Error('Không có quyền giáo viên');
+
+  students = check(await client.from('students').select('*'));
+  rows = check(await client.from('game_attempts').select('*').order('started_at', { ascending: false }))
+    .filter(attempt => challenges.has(attempt.challenge));
+  $('login').hidden = true;
+  $('dashboard').hidden = false;
+
+  const filter = $('filter');
+  filter.replaceChildren(new Option('Tất cả', ''));
+  students.forEach(student => filter.add(new Option(student.display_name, student.id)));
+  render();
+}
+
+function accuracy(attempt) {
+  const firstAttempts = attempt.results.filter(result => result.try === 1);
+  return firstAttempts.length
+    ? `${Math.round(firstAttempts.filter(result => result.correct).length / firstAttempts.length * 100)}%`
+    : '—';
+}
+
+function render() {
+  const root = $('results');
+  root.replaceChildren();
+
+  for (const student of students.filter(item => !$('filter').value || item.id === $('filter').value)) {
+    const card = node('section');
+    card.className = 'game-card';
+    card.style.cssText = 'text-align:left;margin:16px 0';
+    card.append(node('h2', `${student.display_name} · ${student.class_name}`));
+
+    const attempts = rows.filter(attempt => attempt.student_id === student.id);
+    const completed = new Set(
+      attempts
+        .filter(attempt => attempt.completed_at && challenges.has(attempt.challenge))
+        .map(attempt => attempt.challenge)
+    );
+    card.append(node('p', `Hoàn thành ${completed.size}/${GAME_CATALOG.length} challenge`));
+
+    for (const attempt of attempts) {
+      const details = node('details');
+      details.style.margin = '12px 0';
+      details.append(node('summary', `${attempt.challenge} · ${new Date(attempt.started_at).toLocaleString()} · ${attempt.completed_at ? 'Hoàn thành' : 'Đang làm'} · ${accuracy(attempt)} đúng lần đầu`));
+
+      for (const result of attempt.results) {
+        details.append(node('p', `${result.round}. ${result.question} | ${result.answer} → ${result.expected} ${result.correct ? '✓' : '✗'} (lần ${result.try})`));
+      }
+
+      card.append(details);
+    }
+
+    root.append(card);
+  }
+}
+
+$('login').onsubmit = async event => {
+  event.preventDefault();
+  try {
+    const form = new FormData(event.target);
+    check(await (await db()).auth.signInWithPassword({
+      email: String(form.get('email') || '').trim(),
+      password: String(form.get('password') || '')
+    }));
+    await load();
+  } catch (error) {
+    status.textContent = friendlyLoginError(error.message);
+  }
+};
 
 function friendlyLoginError(error) {
   const message = String(error?.message || error || '').toLowerCase()
@@ -16,6 +98,33 @@ function friendlyLoginError(error) {
   return message;
 }
 
-$('filter').onchange=render;$('refresh').onclick=()=>load().catch(e=>status.textContent=e.message);$('logout').onclick=async()=>{await (await db()).auth.signOut();location.reload();};$('export').onclick=()=>{const cell=x=>'"'+String(x??'').replace(/^[=+\-@\t\r]/,"'$&").replaceAll('"','""')+'"';const csv=[['student','challenge','started','completed','accuracy','score','videos'],...rows.filter(r=>!$('filter').value||r.student_id===$('filter').value).map(r=>[students.find(s=>s.id===r.student_id)?.display_name,r.challenge,r.started_at,r.completed_at,accuracy(r),r.score,r.results.filter(x=>x.video_path).length])].map(r=>r.map(cell).join(',')).join('\n');const a=node('a');a.href=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv'}));a.download='alphabet-results.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};load().catch(e=>status.textContent=friendlyLoginError(e));
-const ADMIN_EMAIL = 'admin@alphabet.local';
-const ADMIN_PASSWORD = 'admin1234';
+$('filter').onchange = render;
+$('refresh').onclick = () => load().catch(error => status.textContent = friendlyLoginError(error));
+$('logout').onclick = async () => {
+  await (await db()).auth.signOut();
+  location.reload();
+};
+$('export').onclick = () => {
+  const cell = value => `"${String(value ?? '').replace(/^[=+\-@\t\r]/, "'$&").replaceAll('"', '""')}"`;
+  const csv = [
+    ['student', 'challenge', 'started', 'completed', 'accuracy', 'score'],
+    ...rows
+      .filter(attempt => !$('filter').value || attempt.student_id === $('filter').value)
+      .map(attempt => [
+        students.find(student => student.id === attempt.student_id)?.display_name,
+        attempt.challenge,
+        attempt.started_at,
+        attempt.completed_at,
+        accuracy(attempt),
+        attempt.score
+      ])
+  ].map(row => row.map(cell).join(',')).join('\n');
+
+  const link = node('a');
+  link.href = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv' }));
+  link.download = 'alphabet-results.csv';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+};
+
+load().catch(error => status.textContent = friendlyLoginError(error));

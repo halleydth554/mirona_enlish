@@ -18,7 +18,7 @@ export function renderHome(state) {
       <div class="hero-copy">
         <span class="eyebrow">A LITTLE ADVENTURE FOR BIG LEARNERS</span>
         <h1>Welcome to<br><span>My Alphabet World!</span></h1>
-        <p>Explore four magical islands, practise your ABCs and collect shiny stars.</p>
+        <p>Explore three magical islands, practise your ABCs and collect shiny stars.</p>
         <div class="hero-actions">
           <button class="button button-primary button-large" data-action="start" data-game="matching">Start my adventure <span>🚀</span></button>
           <button class="button button-soft" data-action="library">Explore A–Z <span>📚</span></button>
@@ -33,7 +33,7 @@ export function renderHome(state) {
         <div class="hero-ground"></div>
       </div>
       <div class="hero-stats">
-        <div><strong>${completedCount}/4</strong><span>islands explored</span></div>
+        <div><strong>${completedCount}/${GAME_CATALOG.length}</strong><span>islands explored</span></div>
         <div><strong>⭐ ${totalStars}</strong><span>stars collected</span></div>
         <div><strong>🔤 26</strong><span>letters to learn</span></div>
       </div>

@@ -506,12 +506,6 @@ button:disabled { cursor: default; }
 }
 
 .matching-options .answer-option { font-size: clamp(2rem, 6vw, 3rem); font-family: Arial, sans-serif; text-transform: none; }
-.voice-panel { margin: 18px auto; padding: 16px; background: #f0efff; border-radius: 18px; max-width: 540px; }
-.voice-panel p { margin: 8px 0; }
-.voice-panel small { display:block; color: #686b91; }
-.mic-live { background: #bb3856; color: white; }
-.voice-transcript { overflow-wrap: anywhere; }
-
 /* Shared handwriting cards: identical font scale, baseline and guide positions. */
 .letter-art:has(.letter-guide) {
   width: min(180px, 100%);

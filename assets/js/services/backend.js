@@ -70,11 +70,6 @@ export async function saveAttempt(s){
   return check(result);
 }
 
-export async function uploadClip(){
-  // Browser-only recording remains local; anonymous Auth and storage uploads are disabled.
-  return null;
-}
-
 export async function getProgress(){
   const c=await db();
   const result=await c.rpc('get_student_progress',{p_device_id:getDeviceId()});

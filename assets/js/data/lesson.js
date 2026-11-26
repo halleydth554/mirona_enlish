@@ -55,15 +55,6 @@ export const GAME_CATALOG = [
     color: "mint",
     rounds: 10
   },
-  {
-    id: "speaking",
-    title: "Speaking Studio",
-    subtitle: "Listen and repeat 5 words",
-    icon: "🎙️",
-    island: "Speaking Island",
-    color: "blue",
-    rounds: 5
-  }
 ];
 
 export const LESSON_QUESTION = {
